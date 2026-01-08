@@ -1,0 +1,15 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+#toolbar {
+  padding: 10px;
+  background: #ffffff;
+  border-bottom: 1px solid #ccc;
+}
+
+#map {
+  width: 100vw;
+  height: calc(100vh - 60px);
+}

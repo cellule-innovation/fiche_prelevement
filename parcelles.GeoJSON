@@ -1,0 +1,41 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PARCELLE_001",
+        "bio": "OUI",
+        "culture": "Blé"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.29,46.48],[2.31,46.48],[2.31,46.5],[2.29,46.5],[2.29,46.48]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PARCELLE_002",
+        "bio": "CONVERSION",
+        "culture": "Maïs"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.31,46.48],[2.33,46.48],[2.33,46.5],[2.31,46.5],[2.31,46.48]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PARCELLE_003",
+        "bio": "NON",
+        "culture": "Orge"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[2.33,46.48],[2.35,46.48],[2.35,46.5],[2.33,46.5],[2.33,46.48]]]
+      }
+    }
+  ]
+}
