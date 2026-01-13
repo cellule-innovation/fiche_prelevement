@@ -692,30 +692,37 @@ map.on("draw.create", (e) => {
 // --- Export image ---
 document.getElementById("export").addEventListener("click", async () => {
   try {
-    // Désélectionner la parcelle avant l'export
-    const hadSelection = selectedParcelleId !== null;
-    if (hadSelection) {
-      selectedParcelleId = null;
-      map.setFilter("parcelles-outline-selected", ["==", ["get", "id"], ""]);
-      updateParcellesList();
-      updateButtonsDisplay();
-    }
-    
-    // Attendre un court instant pour que le rendu se mette à jour
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
+    // Capture la carte
     const canvas = await html2canvas(document.getElementById("map"));
-    const image = canvas.toDataURL("image/png");
-    const link = document.createElement("a");
-    link.href = image;
-    link.download = `carte_parcelles_${new Date().toISOString().split('T')[0]}.png`;
-    link.click();
-    console.log("Image exportée");
+    const base64 = canvas.toDataURL("image/png").split(",")[1]; // récupérer juste la base64
+    const params = new URLSearchParams(window.location.search);
+    const imageId = params.get("imgid");
+
+const imageName = imageId + ".png"; // ou .jpg
+
+    // Envoi vers Power Automate
+    const response = await fetch("https://defaultfb09ecdc8906448c868740d3a97d87.07.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/31d2874a36a6410ab1b732d079226083/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2CtG7Oi0jme9Y7oUKZT0jEdAZwwiP26pu2S2_PgjSoU", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageBase64: base64,
+        fileName: `carte_${imageId}.png`,
+        parcelleId: selectedParcelleId || "Aucune",
+        date: new Date().toISOString()
+      })
+    });
+
+    if (!response.ok) throw new Error("Erreur lors de l'envoi vers Power Automate");
+
+    alert("Image envoyée vers Power Automate ✅");
+    console.log("Export terminé et envoyé au flux Power Automate");
+
   } catch (err) {
     console.error(err);
-    alert("Erreur lors de l'export");
+    alert("Erreur lors de l'export vers Power Automate");
   }
 });
+
 
 // --- Export GeoJSON ---
 document.getElementById("export-geojson").addEventListener("click", () => {
