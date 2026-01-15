@@ -224,83 +224,520 @@
   </div>
 
   <script>
-    // --- Initialisation carte ---
-    const map = new maplibregl.Map({
-      container: "map",
-      style: {
-        version: 8,
-        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-        sources: {
-          satellite: {
-            type: "raster",
-            tiles: [
-              "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            ],
-            tileSize: 256,
-            attribution: "© Esri"
-          }
-        },
-        layers: [
-          { id: "satellite", type: "raster", source: "satellite", minzoom: 0, maxzoom: 22 }
-        ]
-      },
-      center: [-1.68, 48.11],
-      zoom: 8,
-      preserveDrawingBuffer: true
-    });
+// --- Initialisation carte avec fond satellite ---
+const map = new maplibregl.Map({
+  container: "map",
+  style: {
+    version: 8,
+    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+    sources: {
+      satellite: {
+        type: "raster",
+        tiles: [
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+        ],
+        tileSize: 256,
+        attribution: "© Esri"
+      }
+    },
+    layers: [
+      {
+        id: "satellite",
+        type: "raster",
+        source: "satellite",
+        minzoom: 0,
+        maxzoom: 22
+      }
+    ]
+  },
+  center: [-1.68, 48.11],
+  zoom: 8,
+  preserveDrawingBuffer: true
+});
 
-    let selectedParcelleId = null;
-    let parcelles = { type: "FeatureCollection", features: [] };
-    const draw = new MapboxDraw({ displayControlsDefault: false, controls: {}, defaultMode: "simple_select" });
-    map.addControl(draw, "top-left");
+// --- Variables globales ---
+let selectedParcelleId = null;
+let parcelles = {
+  type: "FeatureCollection",
+  features: []
+};
 
-    // --- Fonction de géocodage ---
-    function geocodeAddress(address) {
-      const url = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates' +
-                  '?f=json&singleLine=' + encodeURIComponent(address);
+// --- Initialiser MapLibre Draw ---
+const draw = new MapboxDraw({
+  displayControlsDefault: false,
+  controls: {},
+  defaultMode: "simple_select"
+});
+map.addControl(draw, "top-left");
 
-      fetch(url)
-        .then(r => r.json())
-        .then(data => {
-          if (data.candidates && data.candidates.length > 0) {
-            const loc = data.candidates[0].location;
-            map.flyTo({ center: [loc.x, loc.y], zoom: 16, speed: 1.2 });
-
-            if (!map.getSource('geocode-point')) {
-              map.addSource('geocode-point', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-              map.addLayer({
-                id: 'geocode-point-layer',
-                type: 'circle',
-                source: 'geocode-point',
-                paint: { 'circle-radius': 8, 'circle-color': '#FF0000', 'circle-stroke-width': 2, 'circle-stroke-color': '#FFFFFF' }
-              });
-            }
-
-            map.getSource('geocode-point').setData({
-              type: 'FeatureCollection',
-              features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [loc.x, loc.y] }, properties: { address } }]
-            });
-          } else alert('Adresse non trouvée : ' + address);
-        })
-        .catch(err => { console.error(err); alert('Erreur lors du géocodage'); });
+// --- Fonction pour afficher le formulaire de parcelle ---
+function showParcelleForm(parcelleData, callback) {
+  const overlay = document.createElement("div");
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+  `;
+  
+  const popup = document.createElement("div");
+  popup.style.cssText = `
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    min-width: 350px;
+  `;
+  
+  const isEdit = parcelleData.id && parcelleData.id.startsWith('PARCELLE_') && parcelleData.id !== `PARCELLE_${Date.now()}`;
+  const title = isEdit ? "Modifier la parcelle" : "Nouvelle parcelle";
+  
+  popup.innerHTML = `
+    <h3 style="margin: 0 0 20px 0; color: #333; font-size: 20px;">${title}</h3>
+    
+    <div style="margin-bottom: 15px;">
+      <label style="display: block; margin-bottom: 5px; color: #666; font-weight: bold;">ID de la parcelle</label>
+      <input type="text" id="parcelle-id" value="${parcelleData.id || ''}" placeholder="Entrez un nom pour la parcelle" style="width: 100%; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+    </div>
+    
+    <div style="margin-bottom: 15px;">
+      <label style="display: block; margin-bottom: 5px; color: #666; font-weight: bold;">Statut BIO</label>
+      <select id="parcelle-bio" style="width: 100%; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+        <option value="OUI" ${parcelleData.bio === "OUI" ? "selected" : ""}>OUI</option>
+        <option value="CONVERSION" ${parcelleData.bio === "CONVERSION" ? "selected" : ""}>CONVERSION</option>
+        <option value="NON" ${parcelleData.bio === "NON" ? "selected" : ""}>NON</option>
+      </select>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+      <label style="display: block; margin-bottom: 5px; color: #666; font-weight: bold;">Type de culture</label>
+      <input type="text" id="parcelle-culture" value="${parcelleData.culture || ''}" placeholder="Entrez la culture de la parcelle" style="width: 100%; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+    </div>
+    
+    <div style="display: flex; gap: 10px;">
+      <button id="form-ok" style="flex: 1; padding: 12px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">Valider</button>
+      <button id="form-cancel" style="flex: 1; padding: 12px; background: #9E9E9E; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">Annuler</button>
+    </div>
+  `;
+  
+  overlay.appendChild(popup);
+  document.body.appendChild(overlay);
+  
+  setTimeout(() => document.getElementById("parcelle-id").focus(), 100);
+  
+  document.getElementById("form-ok").addEventListener("click", () => {
+    const id = document.getElementById("parcelle-id").value.trim();
+    const bio = document.getElementById("parcelle-bio").value;
+    const culture = document.getElementById("parcelle-culture").value.trim();
+    
+    if (!id) {
+      alert("L'ID de la parcelle est obligatoire");
+      return;
     }
+    
+    if (!culture) {
+      alert("Le type de culture est obligatoire");
+      return;
+    }
+    
+    document.body.removeChild(overlay);
+    callback({ id, bio, culture });
+  });
+  
+  document.getElementById("form-cancel").addEventListener("click", () => {
+    document.body.removeChild(overlay);
+    callback(null);
+  });
+  
+  popup.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      document.getElementById("form-ok").click();
+    }
+  });
+}
 
-    // --- Géocodage automatique depuis l'URL ---
-    window.addEventListener('DOMContentLoaded', () => {
-      const params = new URLSearchParams(window.location.search);
-      const adresseParam = params.get('adresse');
+// --- Fonction pour mettre à jour l'affichage des boutons ---
+function updateButtonsDisplay() {
+  const drawBtn = document.getElementById("draw-polygon");
+  const modifyBtn = document.getElementById("modify-parcelle");
+  
+  if (selectedParcelleId) {
+    drawBtn.style.display = "none";
+    modifyBtn.style.display = "block";
+  } else {
+    drawBtn.style.display = "block";
+    modifyBtn.style.display = "none";
+  }
+}
 
-      if (adresseParam) {
-        // Remplacer les underscores par espaces
-        const adresse = adresseParam.replace(/_/g, ' ');
-        geocodeAddress(adresse);
-        console.log('Géocodage automatique de l\'adresse depuis l\'URL:', adresse);
+// --- Fonction pour mettre à jour la liste des parcelles ---
+function updateParcellesList() {
+  const listContainer = document.getElementById("parcelles-list");
+  
+  if (parcelles.features.length === 0) {
+    listContainer.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🌾</div>
+        <p>Aucune parcelle pour le moment</p>
+        <p style="font-size: 12px; margin-top: 5px;">Cliquez sur "Dessiner" pour commencer</p>
+      </div>
+    `;
+    return;
+  }
+  
+  listContainer.innerHTML = "";
+  
+  parcelles.features.forEach(feature => {
+    const props = feature.properties;
+    const bioClass = `bio-${props.bio.toLowerCase()}`;
+    const isSelected = props.id === selectedParcelleId;
+    
+    const card = document.createElement("div");
+    card.className = `parcelle-card ${bioClass} ${isSelected ? 'selected' : ''}`;
+    card.dataset.id = props.id;
+    
+    card.innerHTML = `
+      <div class="parcelle-header">
+        <span class="parcelle-id">${props.id}</span>
+        <span class="parcelle-bio ${bioClass}">${props.bio}</span>
+      </div>
+      <div class="parcelle-culture">🌱 ${props.culture}</div>
+      <div class="parcelle-prelevee">
+        <input type="checkbox" ${props.prelevee ? 'checked' : ''} onclick="togglePrelevee('${props.id}', event)">
+        <span>Prélevée</span>
+      </div>
+    `;
+    
+    card.addEventListener("click", (e) => {
+      if (e.target.type !== 'checkbox') {
+        selectParcelle(props.id);
       }
     });
+    
+    listContainer.appendChild(card);
+  });
+}
 
-    // --- Le reste de ton code pour les parcelles reste inchangé ---
-    // Ici tu peux coller toutes tes fonctions existantes : 
-    // draw.create, selectParcelle(), updateParcellesList(), etc.
+// --- Fonction pour sélectionner une parcelle ---
+function selectParcelle(id) {
+  selectedParcelleId = id;
+  
+  map.setFilter("parcelles-outline-selected", ["==", ["get", "id"], id]);
+  updateParcellesList();
+  updateButtonsDisplay();
+  
+  const parcelle = parcelles.features.find(f => f.properties.id === id);
+  if (parcelle) {
+    const coords = parcelle.geometry.coordinates[0];
+    let sumLng = 0, sumLat = 0;
+    coords.forEach(c => { sumLng += c[0]; sumLat += c[1]; });
+    const centerLng = sumLng / coords.length;
+    const centerLat = sumLat / coords.length;
+    
+    map.flyTo({ center: [centerLng, centerLat], zoom: 16, speed: 1.2 });
+  }
+  
+  console.log("Parcelle sélectionnée:", id);
+}
+
+// --- Fonction pour basculer l'état prélevée ---
+function togglePrelevee(id, event) {
+  event.stopPropagation();
+  
+  parcelles.features.forEach(f => {
+    if (f.properties.id === id) {
+      f.properties.prelevee = event.target.checked;
+    }
+  });
+  
+  map.getSource("parcelles").setData(parcelles);
+  updateParcellesList();
+  
+  console.log(`Parcelle ${id} prélevée:`, event.target.checked);
+}
+
+window.togglePrelevee = togglePrelevee;
+
+// --- Boutons de dessin ---
+document.getElementById("draw-polygon").addEventListener("click", () => {
+  draw.changeMode("draw_polygon");
+  document.getElementById("draw-polygon").style.display = "none";
+  document.getElementById("cancel-draw").style.display = "block";
+  console.log("Mode dessin activé");
+});
+
+document.getElementById("cancel-draw").addEventListener("click", () => {
+  draw.changeMode("simple_select");
+  document.getElementById("draw-polygon").style.display = "block";
+  document.getElementById("cancel-draw").style.display = "none";
+  updateButtonsDisplay();
+  console.log("Mode dessin annulé");
+});
+
+// --- Bouton Modifier ---
+document.getElementById("modify-parcelle").addEventListener("click", () => {
+  if (!selectedParcelleId) {
+    alert("Aucune parcelle sélectionnée");
+    return;
+  }
+  
+  const parcelle = parcelles.features.find(f => f.properties.id === selectedParcelleId);
+  if (!parcelle) {
+    alert("Parcelle introuvable");
+    return;
+  }
+  
+  showParcelleForm({
+    id: parcelle.properties.id,
+    bio: parcelle.properties.bio,
+    culture: parcelle.properties.culture
+  }, (data) => {
+    if (data === null) return;
+    
+    parcelle.properties.id = data.id;
+    parcelle.properties.bio = data.bio;
+    parcelle.properties.culture = data.culture;
+    
+    map.getSource("parcelles").setData(parcelles);
+    selectedParcelleId = parcelle.properties.id;
+    map.setFilter("parcelles-outline-selected", ["==", ["get", "id"], selectedParcelleId]);
+    updateParcellesList();
+    
+    console.log("Parcelle modifiée:", parcelle.properties);
+  });
+});
+
+document.getElementById("delete-parcelle").addEventListener("click", () => {
+  if (!selectedParcelleId) {
+    alert("Sélectionnez d'abord une parcelle dans la liste");
+    return;
+  }
+  
+  if (confirm(`Voulez-vous vraiment supprimer la parcelle ${selectedParcelleId} ?`)) {
+    parcelles.features = parcelles.features.filter(f => f.properties.id !== selectedParcelleId);
+    map.getSource("parcelles").setData(parcelles);
+    selectedParcelleId = null;
+    map.setFilter("parcelles-outline-selected", ["==", ["get", "id"], ""]);
+    
+    updateParcellesList();
+    updateButtonsDisplay();
+    console.log("Parcelle supprimée");
+  }
+});
+
+// --- Charger la carte ---
+map.on("load", async () => {
+  map.addSource("parcelles", { type: "geojson", data: parcelles });
+
+  map.addLayer({
+    id: "parcelles-fill",
+    type: "fill",
+    source: "parcelles",
+    paint: {
+      "fill-color": [
+        "case",
+        ["==", ["get", "bio"], "OUI"], "#4CAF50",
+        ["==", ["get", "bio"], "CONVERSION"], "#FF9800",
+        "#F44336"
+      ],
+      "fill-opacity": 0.5
+    }
+  });
+
+  map.addLayer({
+    id: "parcelles-outline",
+    type: "line",
+    source: "parcelles",
+    paint: {
+      "line-color": "#FFFFFF",
+      "line-width": 2
+    }
+  });
+
+  map.addLayer({
+    id: "parcelles-outline-selected",
+    type: "line",
+    source: "parcelles",
+    paint: {
+      "line-color": "#FFFF00",
+      "line-width": 4
+    },
+    filter: ["==", ["get", "id"], ""]
+  });
+
+  map.addLayer({
+    id: "parcelles-outline-prelevee",
+    type: "line",
+    source: "parcelles",
+    paint: {
+      "line-color": "#FF00FF",
+      "line-width": 6
+    },
+    filter: ["==", ["get", "prelevee"], true]
+  });
+
+  map.addLayer({
+    id: "parcelles-label",
+    type: "symbol",
+    source: "parcelles",
+    layout: {
+      "text-field": ["get", "culture"],
+      "text-size": 12,
+      "text-allow-overlap": true,
+      "text-anchor": "center"
+    },
+    paint: {
+      "text-color": "#FFFFFF",
+      "text-halo-color": "#000000",
+      "text-halo-width": 2
+    }
+  });
+
+  try {
+    const response = await fetch("parcelles.geojson");
+    if (response.ok) {
+      const data = await response.json();
+      parcelles.features = data.features;
+      map.getSource("parcelles").setData(parcelles);
+      updateParcellesList();
+      console.log(`${parcelles.features.length} parcelles chargées`);
+    }
+  } catch (err) {
+    console.log("Pas de fichier GeoJSON, carte vierge");
+  }
+});
+
+// --- Sélection de parcelle sur la carte ---
+map.on("click", (e) => {
+  const currentMode = draw.getMode();
+  if (currentMode === "draw_polygon") {
+    return;
+  }
+  
+  const features = map.queryRenderedFeatures(e.point, { layers: ["parcelles-fill"] });
+  
+  if (features.length > 0) {
+    const feature = features[0];
+    selectParcelle(feature.properties.id);
+  } else {
+    selectedParcelleId = null;
+    map.setFilter("parcelles-outline-selected", ["==", ["get", "id"], ""]);
+    updateParcellesList();
+    updateButtonsDisplay();
+  }
+});
+
+// --- Création de parcelle ---
+map.on("draw.create", (e) => {
+  console.log("Parcelle dessinée, événement déclenché");
+  
+  const feature = e.features[0];
+
+  showParcelleForm({
+    id: `PARCELLE_${Date.now()}`,
+    bio: "OUI",
+    culture: ""
+  }, (data) => {
+    if (data === null) {
+      draw.delete(feature.id);
+      draw.changeMode("simple_select");
+      document.getElementById("draw-polygon").style.display = "block";
+      document.getElementById("cancel-draw").style.display = "none";
+      return;
+    }
+
+    const newFeature = {
+      type: "Feature",
+      properties: { 
+        id: data.id, 
+        bio: data.bio, 
+        culture: data.culture, 
+        prelevee: false 
+      },
+      geometry: feature.geometry
+    };
+
+    draw.delete(feature.id);
+    parcelles.features.push(newFeature);
+    
+    const source = map.getSource("parcelles");
+    if (source) {
+      const updatedData = JSON.parse(JSON.stringify(parcelles));
+      source.setData(updatedData);
+      console.log("Données de la source mises à jour");
+      map.triggerRepaint();
+    } else {
+      console.error("Source 'parcelles' introuvable!");
+    }
+    
+    updateParcellesList();
+    selectParcelle(data.id);
+    
+    console.log("Parcelle ajoutée:", newFeature);
+    console.log("Total parcelles:", parcelles.features.length);
+    
+    draw.changeMode("simple_select");
+    document.getElementById("draw-polygon").style.display = "block";
+    document.getElementById("cancel-draw").style.display = "none";
+    updateButtonsDisplay();
+  });
+});
+
+// --- Export image ---
+document.getElementById("export").addEventListener("click", async () => {
+  try {
+    // Capture la carte
+    const canvas = await html2canvas(document.getElementById("map"));
+    const base64 = canvas.toDataURL("image/png").split(",")[1]; // récupérer juste la base64
+    const params = new URLSearchParams(window.location.search);
+    const imageId = params.get("imgid");
+
+const imageName = imageId + ".png"; // ou .jpg
+
+    // Envoi vers Power Automate
+    const response = await fetch("https://defaultfb09ecdc8906448c868740d3a97d87.07.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/31d2874a36a6410ab1b732d079226083/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2CtG7Oi0jme9Y7oUKZT0jEdAZwwiP26pu2S2_PgjSoU", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageBase64: base64,
+        fileName: `carte_${imageId}.png`,
+        parcelleId: selectedParcelleId || "Aucune",
+        date: new Date().toISOString()
+      })
+    });
+
+    if (!response.ok) throw new Error("Erreur lors de l'envoi vers Power Automate");
+
+    alert("Image envoyée vers Power Automate ✅");
+    console.log("Export terminé et envoyé au flux Power Automate");
+
+  } catch (err) {
+    console.error(err);
+    alert("Erreur lors de l'export vers Power Automate");
+  }
+});
+
+
+// --- Export GeoJSON ---
+document.getElementById("export-geojson").addEventListener("click", () => {
+  if (parcelles.features.length === 0) {
+    alert("Aucune parcelle à exporter");
+    return;
+  }
+  const blob = new Blob([JSON.stringify(parcelles, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `parcelles_${new Date().toISOString().split('T')[0]}.geojson`;
+  link.click();
+  console.log("GeoJSON exporté");
+});
   </script>
 </body>
 </html>
