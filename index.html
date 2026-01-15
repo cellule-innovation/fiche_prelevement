@@ -599,18 +599,7 @@ map.on("load", async () => {
     }
   });
 
-  try {
-    const response = await fetch("parcelles.geojson");
-    if (response.ok) {
-      const data = await response.json();
-      parcelles.features = data.features;
-      map.getSource("parcelles").setData(parcelles);
-      updateParcellesList();
-      console.log(`${parcelles.features.length} parcelles chargées`);
-    }
-  } catch (err) {
-    console.log("Pas de fichier GeoJSON, carte vierge");
-  }
+  console.log("Carte initialisée sans chargement de fichier GeoJSON");
 });
 
 // --- Sélection de parcelle sur la carte ---
@@ -738,6 +727,65 @@ document.getElementById("export-geojson").addEventListener("click", () => {
   link.click();
   console.log("GeoJSON exporté");
 });
+
+// --- Fonction de géocodage via ArcGIS ---
+function geocodeAddress(address) {
+  const url = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates' +
+              '?f=json&singleLine=' + encodeURIComponent(address);
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (data.candidates && data.candidates.length > 0) {
+        const loc = data.candidates[0].location;
+
+        map.flyTo({ center: [loc.x, loc.y], zoom: 16, speed: 1.2 });
+
+        // Ajouter un point pour visualiser l'adresse
+        if (!map.getSource('geocode-point')) {
+          map.addSource('geocode-point', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+          map.addLayer({
+            id: 'geocode-point-layer',
+            type: 'circle',
+            source: 'geocode-point',
+            paint: {
+              'circle-radius': 8,
+              'circle-color': '#FF0000',
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#FFFFFF'
+            }
+          });
+        }
+
+        map.getSource('geocode-point').setData({
+          type: 'FeatureCollection',
+          features: [
+            { type: 'Feature', geometry: { type: 'Point', coordinates: [loc.x, loc.y] }, properties: { address } }
+          ]
+        });
+
+      } else {
+        alert('Adresse non trouvée : ' + address);
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      alert('Erreur lors du géocodage');
+    });
+}
+
+// --- Géocodage automatique depuis l'URL ---
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const adresseParam = params.get('adresse');
+  if (adresseParam) {
+    // Remplacer les underscores par des espaces si nécessaire
+    const adresse = adresseParam.replace(/_/g, ' ');
+    geocodeAddress(adresse);
+    console.log('Géocodage automatique de l\'adresse :', adresse);
+  }
+});
+
   </script>
 </body>
 </html>
