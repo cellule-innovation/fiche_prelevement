@@ -113,7 +113,8 @@
     <h2>🗺️ Gestion des Parcelles</h2>
     <div class="actions">
       <button id="draw-polygon" class="btn btn-draw">🖊️ Dessiner</button>
-      <button id="modify-parcelle" class="btn btn-modify">✏️ Modifier</button>
+      <button id="edit-info" class="btn btn-modify" style="display:none;">📝 Modifier info</button>
+      <button id="modify-parcelle" class="btn btn-modify" style="display:none;">✏️ Modifier forme</button>
       <button id="cancel-draw" class="btn btn-cancel">❌ Annuler</button>
       <button id="delete-parcelle" class="btn btn-delete">🗑️ Supprimer</button>
     </div>
@@ -168,8 +169,24 @@ const map = new maplibregl.Map({
   style: {
     version: 8,
     glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-    sources: { satellite: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, attribution: "© Esri" } },
-    layers: [{ id:"satellite", type:"raster", source:"satellite", minzoom:0, maxzoom:22 }]
+    sources: { 
+      "esri-hybrid": { 
+        type: "raster", 
+        tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], 
+        tileSize: 256, 
+        attribution: "© Esri" 
+      },
+      "esri-labels": {
+        type: "raster",
+        tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],
+        tileSize: 256,
+        attribution: "© Esri"
+      }
+    },
+    layers: [
+      { id:"satellite", type:"raster", source:"esri-hybrid", minzoom:0, maxzoom:22 },
+      { id:"labels", type:"raster", source:"esri-labels", minzoom:0, maxzoom:22 }
+    ]
   },
   center: [-1.68,48.11],
   zoom: 8,
@@ -223,8 +240,17 @@ function updateParcellesList() {
 function updateButtonsDisplay(){
   const drawBtn=document.getElementById("draw-polygon");
   const modifyBtn=document.getElementById("modify-parcelle");
-  if(selectedParcelleId){ drawBtn.style.display="none"; modifyBtn.style.display="block"; }
-  else{ drawBtn.style.display="block"; modifyBtn.style.display="none"; }
+  const editInfoBtn=document.getElementById("edit-info");
+  if(selectedParcelleId){ 
+    drawBtn.style.display="none"; 
+    modifyBtn.style.display="block"; 
+    editInfoBtn.style.display="block";
+  }
+  else{ 
+    drawBtn.style.display="block"; 
+    modifyBtn.style.display="none"; 
+    editInfoBtn.style.display="none";
+  }
 }
 function selectParcelle(id){
   selectedParcelleId=id;
@@ -251,6 +277,47 @@ window.toggleOperateur=toggleOperateur;
 // --- Boutons dessin ---
 document.getElementById("draw-polygon").addEventListener("click",()=>{ draw.changeMode("draw_polygon"); document.getElementById("draw-polygon").style.display="none"; document.getElementById("cancel-draw").style.display="block"; console.log("Mode dessin activé");});
 document.getElementById("cancel-draw").addEventListener("click",()=>{ draw.changeMode("simple_select"); document.getElementById("draw-polygon").style.display="block"; document.getElementById("cancel-draw").style.display="none"; updateButtonsDisplay(); console.log("Mode dessin annulé");});
+
+// --- Bouton modifier les informations ---
+document.getElementById("edit-info").addEventListener("click",()=>{
+  if(!selectedParcelleId) return;
+  const parcelle = parcelles.features.find(f=>f.properties.id===selectedParcelleId);
+  if(!parcelle) return;
+  
+  // Ouvrir le formulaire avec les données actuelles
+  const modal = document.getElementById("modal-parcelle");
+  const form = document.getElementById("form-parcelle");
+  
+  document.getElementById("parcelle-id").value = parcelle.properties.id;
+  document.getElementById("parcelle-bio").value = parcelle.properties.bio;
+  document.getElementById("parcelle-culture").value = parcelle.properties.culture;
+  
+  modal.classList.add("active");
+  
+  // Gestion annulation
+  document.getElementById("modal-cancel").onclick = () => {
+    modal.classList.remove("active");
+  };
+  
+  // Gestion soumission
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    
+    // Mettre à jour les propriétés
+    parcelle.properties.id = document.getElementById("parcelle-id").value;
+    parcelle.properties.bio = document.getElementById("parcelle-bio").value;
+    parcelle.properties.culture = document.getElementById("parcelle-culture").value;
+    
+    // Rafraîchir la carte et la liste
+    map.getSource("parcelles")?.setData(parcelles);
+    updateParcellesList();
+    selectedParcelleId = parcelle.properties.id;
+    updateButtonsDisplay();
+    
+    modal.classList.remove("active");
+    console.log("Informations parcelle mises à jour:", parcelle.properties);
+  };
+});
 
 // --- Bouton modifier parcelle ---
 document.getElementById("modify-parcelle").addEventListener("click",()=>{
@@ -301,12 +368,6 @@ map.on("load",()=>{
   map.addLayer({id:"parcelles-outline-selected", type:"line", source:"parcelles", paint:{"line-color":"#FFFF00","line-width":5}, filter:["==",["get","id"],""]});
   map.addLayer({id:"parcelles-label", type:"symbol", source:"parcelles", layout:{"text-field":["get","culture"],"text-size":12,"text-allow-overlap":true,"text-anchor":"center"}, paint:{"text-color":"#FFFFFF","text-halo-color":"#000000","text-halo-width":2}});
 
-  // --- Ajout des noms de villes/communes et lieux-dits ---
-  map.addSource("esri-labels", {type: "raster",tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],tileSize: 256});
-  map.addLayer({id: "esri-labels",type: "raster",source: "esri-labels"});
-
-
-
   // --- Source flèches ---
   map.addSource("sampling-arrows",{type:"geojson", data:samplingArrows});
   map.addLayer({id:"sampling-arrows-line", type:"line", source:"sampling-arrows", filter:["==",["geometry-type"],"LineString"], paint:{"line-color":"#FF0000","line-width":3}});
@@ -325,9 +386,13 @@ map.on("draw.create",e=>{
 });
 
 // --- Formulaire parcelle ---
-function showParcelleForm(defaultData) {
+function showParcelleForm(defaultData, isEdit = false) {
   const modal = document.getElementById("modal-parcelle");
   const form = document.getElementById("form-parcelle");
+  const modalHeader = document.querySelector(".modal-header");
+  
+  // Changer le titre selon le mode
+  modalHeader.textContent = isEdit ? "✏️ Modifier Parcelle" : "🌾 Nouvelle Parcelle";
   
   document.getElementById("parcelle-id").value = defaultData.id;
   document.getElementById("parcelle-bio").value = defaultData.bio;
