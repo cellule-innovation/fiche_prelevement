@@ -301,6 +301,12 @@ map.on("load",()=>{
   map.addLayer({id:"parcelles-outline-selected", type:"line", source:"parcelles", paint:{"line-color":"#FFFF00","line-width":5}, filter:["==",["get","id"],""]});
   map.addLayer({id:"parcelles-label", type:"symbol", source:"parcelles", layout:{"text-field":["get","culture"],"text-size":12,"text-allow-overlap":true,"text-anchor":"center"}, paint:{"text-color":"#FFFFFF","text-halo-color":"#000000","text-halo-width":2}});
 
+  // --- Ajout des noms de villes/communes et lieux-dits ---
+  map.addSource("esri-labels", {type: "raster",tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],tileSize: 256});
+  map.addLayer({id: "esri-labels",type: "raster",source: "esri-labels"});
+
+
+
   // --- Source flèches ---
   map.addSource("sampling-arrows",{type:"geojson", data:samplingArrows});
   map.addLayer({id:"sampling-arrows-line", type:"line", source:"sampling-arrows", filter:["==",["geometry-type"],"LineString"], paint:{"line-color":"#FF0000","line-width":3}});
