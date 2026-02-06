@@ -518,11 +518,23 @@ document.getElementById("draw-sampling").addEventListener("click",()=>{
 // --- Export image et GeoJSON ---
 document.getElementById("export").addEventListener("click", async ()=>{
   try{
+    // Désélectionner la parcelle avant l'export
+    const wasSelected = selectedParcelleId;
+    if(selectedParcelleId) {
+      selectedParcelleId = null;
+      map.setFilter("parcelles-outline-selected",["==",["get","id"],""]);
+      updateParcellesList();
+      updateButtonsDisplay();
+    }
+    
+    // Attendre un peu que le rendu se mette à jour
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
     const canvas=await html2canvas(document.getElementById("map"));
     const base64=canvas.toDataURL("image/png").split(",")[1];
     const params=new URLSearchParams(window.location.search);
     const imageId=params.get("imgid")||"image";
-    await fetch("https://defaultfb09ecdc8906448c868740d3a97d87.07.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/31d2874a36a6410ab1b732d079226083/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2CtG7Oi0jme9Y7oUKZT0jEdAZwwiP26pu2S2_PgjSoU",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({imageBase64:base64,fileName:`carte_${imageId}.png`,parcelleId:selectedParcelleId||"Aucune",date:new Date().toISOString()})});
+    await fetch("https://defaultfb09ecdc8906448c868740d3a97d87.07.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/31d2874a36a6410ab1b732d079226083/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2CtG7Oi0jme9Y7oUKZT0jEdAZwwiP26pu2S2_PgjSoU",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({imageBase64:base64,fileName:`carte_${imageId}.png`,parcelleId:wasSelected||"Aucune",date:new Date().toISOString()})});
     alert("Image envoyée vers Power Automate ✅");
   }catch(err){ console.error(err); alert("Erreur lors de l'export vers Power Automate"); }
 });
