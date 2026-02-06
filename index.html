@@ -139,19 +139,19 @@
       <div class="modal-header">🌾 Nouvelle Parcelle</div>
       <form id="form-parcelle">
         <div class="form-group">
-          <label for="parcelle-id">ID de la parcelle</label>
+          <label for="parcelle-id">Nom de la parcelle</label>
           <input type="text" id="parcelle-id" required>
         </div>
         <div class="form-group">
           <label for="parcelle-bio">Statut BIO</label>
           <select id="parcelle-bio" required>
-            <option value="OUI">OUI</option>
+            <option value="OUI">BIO</option>
             <option value="CONVERSION">CONVERSION</option>
-            <option value="NON">NON</option>
+            <option value="NON">CONVENTIONNEL</option>
           </select>
         </div>
         <div class="form-group">
-          <label for="parcelle-culture">Type de culture</label>
+          <label for="parcelle-culture">Culture</label>
           <input type="text" id="parcelle-culture" required>
         </div>
         <div class="modal-actions">
@@ -190,6 +190,7 @@ const map = new maplibregl.Map({
   },
   center: [-1.68,48.11],
   zoom: 8,
+  maxZoom: 18,
   preserveDrawingBuffer:true
 });
 
@@ -254,6 +255,9 @@ function updateButtonsDisplay(){
 }
 function selectParcelle(id){
   selectedParcelleId=id;
+  // Filtrer la couche normale pour exclure la parcelle sélectionnée
+  map.setFilter("parcelles-outline",["!=",["get","id"],id]);
+  // Filtrer la couche sélectionnée pour n'afficher que la parcelle sélectionnée
   map.setFilter("parcelles-outline-selected",["==",["get","id"],id]);
   updateParcellesList();
   updateButtonsDisplay();
@@ -303,10 +307,20 @@ document.getElementById("edit-info").addEventListener("click",()=>{
   form.onsubmit = (e) => {
     e.preventDefault();
     
+    const newId = document.getElementById("parcelle-id").value;
+    const newBio = document.getElementById("parcelle-bio").value;
+    const newCulture = document.getElementById("parcelle-culture").value;
+    
+    // Validation : vérifier que l'ID n'est pas juste "Ilot " sans numéro
+    if (newId.trim() === "Ilot" || newId.trim() === "") {
+      alert("⚠️ Veuillez renseigner un numéro d'ilot (ex: Ilot 1.1)");
+      return;
+    }
+    
     // Mettre à jour les propriétés
-    parcelle.properties.id = document.getElementById("parcelle-id").value;
-    parcelle.properties.bio = document.getElementById("parcelle-bio").value;
-    parcelle.properties.culture = document.getElementById("parcelle-culture").value;
+    parcelle.properties.id = newId;
+    parcelle.properties.bio = newBio;
+    parcelle.properties.culture = newCulture;
     
     // Rafraîchir la carte et la liste
     map.getSource("parcelles")?.setData(parcelles);
@@ -342,6 +356,7 @@ document.getElementById("delete-parcelle").addEventListener("click",()=>{
   selectedParcelleId = null;
   updateParcellesList();
   updateButtonsDisplay();
+  map.setFilter("parcelles-outline",["!=",["get","id"],""]);
   map.setFilter("parcelles-outline-selected",["==",["get","id"],""]);
   
   console.log("Parcelle supprimée");
@@ -364,8 +379,8 @@ map.on("draw.update", e=>{
 map.on("load",()=>{
   map.addSource("parcelles",{type:"geojson", data:parcelles});
   map.addLayer({id:"parcelles-fill", type:"fill", source:"parcelles", paint:{"fill-color":["case",["==",["get","bio"],"OUI"],"#4CAF50",["==",["get","bio"],"CONVERSION"],"#FF9800","#F44336"],"fill-opacity":0.5}});
-  map.addLayer({id:"parcelles-outline", type:"line", source:"parcelles", paint:{"line-color":["case",["boolean",["get","isOperateur"],false],"#00FF00","#FF0000"],"line-width":3}});
-  map.addLayer({id:"parcelles-outline-selected", type:"line", source:"parcelles", paint:{"line-color":"#FFFF00","line-width":5}, filter:["==",["get","id"],""]});
+  map.addLayer({id:"parcelles-outline", type:"line", source:"parcelles", paint:{"line-color":["case",["boolean",["get","isOperateur"],false],"#00FF00","#FF0000"],"line-width":3}, filter:["!=",["get","id"],selectedParcelleId || ""]});
+  map.addLayer({id:"parcelles-outline-selected", type:"line", source:"parcelles", paint:{"line-color":["case",["boolean",["get","isOperateur"],false],"#00FF00","#FF0000"],"line-width":6}, filter:["==",["get","id"],""]});
   map.addLayer({id:"parcelles-label", type:"symbol", source:"parcelles", layout:{"text-field":["get","culture"],"text-size":12,"text-allow-overlap":true,"text-anchor":"center"}, paint:{"text-color":"#FFFFFF","text-halo-color":"#000000","text-halo-width":2}});
 
   // --- Source flèches ---
@@ -382,7 +397,7 @@ map.on("load",()=>{
 // --- Dessin parcelle ---
 map.on("draw.create",e=>{
   currentDrawnFeature = e.features[0];
-  showParcelleForm({id:`PARCELLE_${Date.now()}`, bio:"OUI", culture:""});
+  showParcelleForm({id:`Ilot `, bio:"OUI", culture:""});
 });
 
 // --- Formulaire parcelle ---
@@ -420,6 +435,12 @@ function showParcelleForm(defaultData, isEdit = false) {
       bio: document.getElementById("parcelle-bio").value,
       culture: document.getElementById("parcelle-culture").value
     };
+    
+    // Validation : vérifier que l'ID n'est pas juste "Ilot " sans numéro
+    if (data.id.trim() === "Ilot" || data.id.trim() === "") {
+      alert("⚠️ Veuillez renseigner un numéro d'ilot (ex: Ilot 1.1)");
+      return;
+    }
     
     modal.classList.remove("active");
     
@@ -473,7 +494,13 @@ map.on("click",(e)=>{
   if(currentMode==="draw_polygon") return;
   const features=map.queryRenderedFeatures(e.point,{layers:["parcelles-fill"]});
   if(features.length>0) selectParcelle(features[0].properties.id);
-  else{ selectedParcelleId=null; map.setFilter("parcelles-outline-selected",["==",["get","id"],""]); updateParcellesList(); updateButtonsDisplay(); }
+  else{ 
+    selectedParcelleId=null; 
+    map.setFilter("parcelles-outline",["!=",["get","id"],""]);
+    map.setFilter("parcelles-outline-selected",["==",["get","id"],""]); 
+    updateParcellesList(); 
+    updateButtonsDisplay(); 
+  }
 });
 
 // --- Fonction mise à jour affichage points ---
@@ -522,6 +549,7 @@ document.getElementById("export").addEventListener("click", async ()=>{
     const wasSelected = selectedParcelleId;
     if(selectedParcelleId) {
       selectedParcelleId = null;
+      map.setFilter("parcelles-outline",["!=",["get","id"],""]);
       map.setFilter("parcelles-outline-selected",["==",["get","id"],""]);
       updateParcellesList();
       updateButtonsDisplay();
