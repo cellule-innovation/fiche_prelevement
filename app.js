@@ -538,7 +538,7 @@ document.getElementById("export").addEventListener("click", async ()=>{
         date:new Date().toISOString()
       })
     });
-    alert("Image envoyée vers Power Automate ✅");
+    alert("Image envoyée, vous pouvez retourner sur la saisie de la fiche de prélèvement ✅");
   }catch(err){ 
     console.error(err); 
     alert("Erreur lors de l'export vers Power Automate"); 
@@ -600,4 +600,5 @@ window.addEventListener('DOMContentLoaded',()=>{
     geocodeAddress(adresse);
     console.log('Géocodage automatique de l\'adresse :',adresse);
   }
+
 });
