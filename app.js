@@ -190,6 +190,9 @@ document.getElementById("modify-parcelle").addEventListener("click",()=>{
   const parcelle = parcelles.features.find(f=>f.properties.id===selectedParcelleId);
   if(!parcelle) return;
   
+  // Supprimer toutes les features existantes dans Draw avant d'en ajouter une nouvelle
+  draw.deleteAll();
+  
   // Ajouter la géométrie à MapLibre Draw pour modification
   const drawId = draw.add(parcelle);
   draw.changeMode("direct_select", {featureId: drawId[0]});
@@ -535,7 +538,7 @@ document.getElementById("export").addEventListener("click", async ()=>{
         date:new Date().toISOString()
       })
     });
-    alert("Image envoyée, vous pouvez retourner sur votre fiche de prélèvement ✅");
+    alert("Image envoyée vers Power Automate ✅");
   }catch(err){ 
     console.error(err); 
     alert("Erreur lors de l'export vers Power Automate"); 
