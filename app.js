@@ -528,7 +528,7 @@ document.getElementById("export").addEventListener("click", async ()=>{
     const base64=canvas.toDataURL("image/png").split(",")[1];
     const params=new URLSearchParams(window.location.search);
     const imageId=params.get("imgid")||"image";
-    await fetch("https://defaultfb09ecdc8906448c868740d3a97d87.07.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/31d2874a36a6410ab1b732d079226083/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2CtG7Oi0jme9Y7oUKZT0jEdAZwwiP26pu2S2_PgjSoU",{
+    await fetch("https://5f4c2ef7cb87e005b1cd33704258b3.f8.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/cd034000f3374556bfb37b0570880e10/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=LTEeUyzcJMEZwEgtViRwJM8skOp4WGEZiGL10a6Ivu8",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
@@ -602,3 +602,4 @@ window.addEventListener('DOMContentLoaded',()=>{
   }
 
 });
+
