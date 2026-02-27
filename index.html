@@ -20,7 +20,17 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="map"></div>
+  <div id="map"><!-- Légende bordures non prélevées (visible sur export) -->
+    <div id="legende-bordures">
+      <span>Bordures non prélevées :</span>
+      <input type="number" id="bordures-valeur" min="0" placeholder="">
+      <select id="bordures-unite">
+        <option value="m">m</option>
+        <option value="rangs">rangs</option>
+      </select>
+    </div>
+  </div>
+  
   <div id="sidebar">
     <h2>🗺️ Gestion des Parcelles</h2>
     <div class="actions">
@@ -57,9 +67,9 @@
         <div class="form-group">
           <label for="parcelle-bio">Statut BIO</label>
           <select id="parcelle-bio" required>
-            <option value="OUI">OUI</option>
+            <option value="BIO">BIO</option>
             <option value="CONVERSION">CONVERSION</option>
-            <option value="NON">NON</option>
+            <option value="CONVENTIONNEL">NON</option>
           </select>
         </div>
         <div class="form-group">
@@ -73,6 +83,23 @@
       </form>
     </div>
   </div>
+  <!-- Bouton info flottant -->
+<div id="info-btn-container">
+  <button id="info-btn" aria-label="Informations">i</button>
+  <div id="info-popup">
+    <div class="info-popup-header">
+      <strong>ℹ️ Aide &amp; Informations</strong>
+    </div>
+    <div class="info-popup-body">
+      <p><div class="info-popup-body">
+  <p>📋 <strong>Informations à indiquer sur le schéma :</strong></p>
+  <p>🌾 <strong>Parcelles voisines</strong> : appartenance (opérateur ou voisin), conduite (BIO ou conventionnelle) et culture en place.</p>
+  <p>📍 <strong>Points de prélèvement</strong> : ≥ 9 prises élémentaires (indiquées par une un point de prélèvement) et sens du prélèvement (ordre de saisie des points de prélèvement).</p>
+  <p>🧭 <strong>Orientation</strong> :  Bordures non prélevées (≈ m ou rangs).</p>
+</div></p>
+    </div>
+  </div>
+</div>
 
   <!-- Script personnalisé -->
   <script src="app.js"></script>

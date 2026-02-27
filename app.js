@@ -238,7 +238,7 @@ map.on("load",()=>{
     source:"parcelles", 
     paint:{
       "fill-color":["case",
-        ["==",["get","bio"],"OUI"],"#4CAF50",
+        ["==",["get","bio"],"BIO"],"#4CAF50",
         ["==",["get","bio"],"CONVERSION"],"#FF9800",
         "#F44336"
       ],
@@ -339,7 +339,7 @@ map.on("load",()=>{
 // --- Dessin parcelle ---
 map.on("draw.create",e=>{
   currentDrawnFeature = e.features[0];
-  showParcelleForm({id:`Ilot `, bio:"OUI", culture:""});
+  showParcelleForm({id:`Ilot `, bio:"BIO", culture:""});
 });
 
 // --- Formulaire parcelle ---
@@ -528,7 +528,7 @@ document.getElementById("export").addEventListener("click", async ()=>{
     const base64=canvas.toDataURL("image/png").split(",")[1];
     const params=new URLSearchParams(window.location.search);
     const imageId=params.get("imgid")||"image";
-    await fetch("https://5f4c2ef7cb87e005b1cd33704258b3.f8.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/cd034000f3374556bfb37b0570880e10/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=LTEeUyzcJMEZwEgtViRwJM8skOp4WGEZiGL10a6Ivu8",{
+    await fetch("https://5f4c2ef7cb87e005b1cd33704258b3.f8.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/cd034000f3374556bfb37b0570880e10/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=LTEeUyzcJMEZwEgtViRwJM8skOp4WGEZiGL10a6Ivu8",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
@@ -538,7 +538,7 @@ document.getElementById("export").addEventListener("click", async ()=>{
         date:new Date().toISOString()
       })
     });
-    alert("Image envoyée, vous pouvez retourner sur la saisie de la fiche de prélèvement ✅");
+    alert("Image envoyée vers Power Automate ✅");
   }catch(err){ 
     console.error(err); 
     alert("Erreur lors de l'export vers Power Automate"); 
@@ -600,6 +600,17 @@ window.addEventListener('DOMContentLoaded',()=>{
     geocodeAddress(adresse);
     console.log('Géocodage automatique de l\'adresse :',adresse);
   }
-
 });
 
+// --- Légende bordures non prélevées ---
+const borduresValeur = document.getElementById("bordures-valeur");
+const borduresUnite = document.getElementById("bordures-unite");
+
+function updateBorduresAffichage() {
+  const val = borduresValeur.value;
+  const unite = borduresUnite.value;
+  document.getElementById("bordures-affichage").textContent = val ? `≈ ${val} ${unite}` : "";
+}
+
+borduresValeur.addEventListener("input", updateBorduresAffichage);
+borduresUnite.addEventListener("change", updateBorduresAffichage);
