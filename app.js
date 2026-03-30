@@ -541,7 +541,7 @@ document.getElementById("export").addEventListener("click", async ()=>{
     alert("Opération terminée. Vous pouvez fermer cet onglet puis finaliser la saisie du prélèvement");
   }catch(err){ 
     console.error(err); 
-    alert("Erreur lors de l'export vers Power Automate"); 
+    alert("Erreur lors de l'export de l'image"); 
   }
 });
 
@@ -609,7 +609,13 @@ const borduresUnite = document.getElementById("bordures-unite");
 function updateBorduresAffichage() {
   const val = borduresValeur.value;
   const unite = borduresUnite.value;
-  document.getElementById("bordures-affichage").textContent = val ? `≈ ${val} ${unite}` : "";
+  const exportEl = document.getElementById("legende-bordures-export");
+  if (val && val > 0) {
+    exportEl.textContent = `Bordures non prélevées : ≈ ${val} ${unite}`;
+    exportEl.style.display = "block";
+  } else {
+    exportEl.style.display = "none";
+  }
 }
 
 borduresValeur.addEventListener("input", updateBorduresAffichage);
