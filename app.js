@@ -538,7 +538,7 @@ document.getElementById("export").addEventListener("click", async ()=>{
         date:new Date().toISOString()
       })
     });
-    alert("Image envoyée vers Power Automate ✅");
+    alert("Opération terminée. Vous pouvez fermer cet onglet puis finaliser la saisie du prélèvement");
   }catch(err){ 
     console.error(err); 
     alert("Erreur lors de l'export vers Power Automate"); 
