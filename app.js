@@ -39,6 +39,9 @@ let samplingMode = false;
 let samplingPoints = [];
 let currentDrawnFeature = null;
 let parcelleFormCallback = null;
+let annotateMode = false;
+let pendingAnnotationCoords = null;
+const annotations = [];
 
 // --- MapLibre Draw ---
 const draw = new MapboxDraw({ displayControlsDefault:false, controls:{}, defaultMode:"simple_select" });
@@ -395,8 +398,9 @@ function showParcelleForm(defaultData, isEdit = false) {
       draw.delete(currentDrawnFeature.id);
       parcelles.features.push(newF);
       map.getSource("parcelles")?.setData(parcelles);
+      selectedParcelleId = null;
+      map.setFilter("parcelles-outline-selected", ["==", ["get", "id"], ""]);
       updateParcellesList();
-      selectParcelle(data.id);
       currentDrawnFeature = null;
     }
     
@@ -410,6 +414,19 @@ function showParcelleForm(defaultData, isEdit = false) {
 
 // --- Mode flèche sur carte ---
 map.on("click",(e)=>{
+  // Mode annotation
+  if(annotateMode){
+    pendingAnnotationCoords = e.lngLat;
+    annotationModal.classList.add("active");
+    document.getElementById("annotation-text").value = "";
+    setTimeout(() => document.getElementById("annotation-text").focus(), 100);
+    annotateMode = false;
+    annotateBtn.classList.remove("active");
+    annotateBtn.textContent = "🏷️ Ajouter une annotation";
+    map.getCanvas().style.cursor = "";
+    return;
+  }
+
   // Mode points de prélèvement
   if(samplingMode){
     const coords=[e.lngLat.lng,e.lngLat.lat];
@@ -465,17 +482,38 @@ function updateSamplingPointsDisplay(){
 // --- Bouton points de prélèvement ---
 document.getElementById("sampling-points").addEventListener("click",()=>{
   const btn=document.getElementById("sampling-points");
-  if(!samplingMode){
+
+  // État : supprimer les points existants
+  if(btn.dataset.state === "delete"){
+    if(!confirm("Supprimer tous les points de prélèvement ?")) return;
+    samplingPoints=[];
+    map.getSource("sampling-points").setData({type:"FeatureCollection",features:[]});
+    samplingArrows.features=[];
+    map.getSource("sampling-arrows").setData(samplingArrows);
+    btn.dataset.state="";
+    btn.classList.remove("active","delete");
+    btn.textContent="📍 Ajouter points de prélèvement";
+    console.log("Points de prélèvement supprimés");
+    return;
+  }
+
+  // État : en cours de saisie → terminer
+  if(samplingMode){
+    samplingMode=false;
+    btn.classList.remove("active");
+    btn.dataset.state="delete";
+    btn.classList.add("delete");
+    btn.textContent="🗑️ Supprimer les points de prélèvement";
+    console.log("Mode points de prélèvement TERMINÉ. Points:",samplingPoints.length);
+
+  // État : pas encore de saisie → démarrer
+  } else {
     samplingMode=true;
     samplingPoints=[];
+    btn.dataset.state="";
     btn.classList.add("active");
     btn.textContent="✅ Terminer la saisie";
     console.log("Mode points de prélèvement ACTIVÉ");
-  }else{
-    samplingMode=false;
-    btn.classList.remove("active");
-    btn.textContent="📍 Ajouter points de prélèvement";
-    console.log("Mode points de prélèvement TERMINÉ. Points:",samplingPoints.length);
   }
 });
 
@@ -521,10 +559,14 @@ document.getElementById("export").addEventListener("click", async ()=>{
       updateButtonsDisplay();
     }
     
+    // Masquer les boutons de contrôle des annotations pendant la capture
+    document.body.classList.add("exporting");
+    
     // Attendre un peu que le rendu se mette à jour
     await new Promise(resolve => setTimeout(resolve, 300));
     
     const canvas=await html2canvas(document.getElementById("map"));
+    document.body.classList.remove("exporting");
     const base64=canvas.toDataURL("image/png").split(",")[1];
     const params=new URLSearchParams(window.location.search);
     const imageId=params.get("imgid")||"image";
@@ -541,21 +583,9 @@ document.getElementById("export").addEventListener("click", async ()=>{
     alert("Opération terminée. Vous pouvez fermer cet onglet puis finaliser la saisie du prélèvement");
   }catch(err){ 
     console.error(err); 
+    document.body.classList.remove("exporting");
     alert("Erreur lors de l'export de l'image"); 
   }
-});
-
-document.getElementById("export-geojson").addEventListener("click",()=>{
-  if(parcelles.features.length===0){ 
-    alert("Aucune parcelle à exporter"); 
-    return; 
-  }
-  const blob=new Blob([JSON.stringify(parcelles,null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob);
-  const link=document.createElement("a");
-  link.href=url;
-  link.download=`parcelles_${new Date().toISOString().split('T')[0]}.geojson`;
-  link.click();
 });
 
 // --- Géocodage ArcGIS ---
@@ -602,6 +632,202 @@ window.addEventListener('DOMContentLoaded',()=>{
   }
 });
 
+// --- Système d'annotations géo-ancrées ---
+const annotateBtn = document.getElementById("annotate-btn");
+const annotationModal = document.getElementById("modal-annotation");
+
+annotateBtn.addEventListener("click", () => {
+  annotateMode = !annotateMode;
+  if (annotateMode) {
+    annotateBtn.classList.add("active");
+    annotateBtn.textContent = "🏷️ Cliquez sur la carte…";
+    map.getCanvas().style.cursor = "crosshair";
+  } else {
+    annotateBtn.classList.remove("active");
+    annotateBtn.textContent = "🏷️ Ajouter une annotation";
+    map.getCanvas().style.cursor = "";
+  }
+});
+
+document.getElementById("annotation-cancel").addEventListener("click", () => {
+  annotationModal.classList.remove("active");
+  pendingAnnotationCoords = null;
+  // Réinitialiser la modal en mode création
+  _resetAnnotationModal();
+});
+
+document.getElementById("annotation-save").addEventListener("click", () => {
+  const text = document.getElementById("annotation-text").value.trim();
+  if (!text || !pendingAnnotationCoords) {
+    annotationModal.classList.remove("active");
+    _resetAnnotationModal();
+    return;
+  }
+  annotationModal.classList.remove("active");
+  createAnnotation(text, pendingAnnotationCoords);
+  pendingAnnotationCoords = null;
+  _resetAnnotationModal();
+});
+
+// Bouton modifier (mode édition)
+document.getElementById("annotation-edit").addEventListener("click", () => {
+  // géré dynamiquement dans openEditModal
+});
+
+function _resetAnnotationModal() {
+  document.getElementById("annotation-modal-header").textContent = "🏷️ Nouvelle annotation";
+  document.getElementById("annotation-save").style.display = "block";
+  document.getElementById("annotation-edit").style.display = "none";
+  document.getElementById("annotation-edit").onclick = null;
+}
+
+function openEditModal(textSpan) {
+  const modal = document.getElementById("modal-annotation");
+  document.getElementById("annotation-modal-header").textContent = "✏️ Modifier l'annotation";
+  document.getElementById("annotation-text").value = textSpan.textContent;
+  document.getElementById("annotation-save").style.display = "none";
+  document.getElementById("annotation-edit").style.display = "block";
+  document.getElementById("annotation-edit").onclick = () => {
+    const newText = document.getElementById("annotation-text").value.trim();
+    if (newText) textSpan.textContent = newText;
+    modal.classList.remove("active");
+    _resetAnnotationModal();
+  };
+  modal.classList.add("active");
+  setTimeout(() => document.getElementById("annotation-text").focus(), 100);
+}
+
+document.getElementById("annotation-text").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    const editBtn = document.getElementById("annotation-edit");
+    if (editBtn.style.display !== "none") {
+      editBtn.click();
+    } else {
+      document.getElementById("annotation-save").click();
+    }
+  }
+});
+
+function createAnnotation(text, lngLat) {
+  const mapEl = document.getElementById("map");
+
+  const label = document.createElement("div");
+  label.className = "map-annotation";
+
+  // Texte dans un span pour ne pas être perturbé par les boutons
+  const textSpan = document.createElement("span");
+  textSpan.className = "annotation-text-content";
+  textSpan.textContent = text;
+  label.appendChild(textSpan);
+
+  // Double-clic pour éditer
+  label.addEventListener("dblclick", (e) => {
+    if (e.target.closest(".annotation-controls")) return;
+    openEditModal(textSpan);
+  });
+
+  let rotation = 0;
+
+  // Conteneur des boutons de contrôle
+  const controls = document.createElement("div");
+  controls.className = "annotation-controls";
+
+  // Bouton rotation gauche
+  const rotLeft = document.createElement("i");
+  rotLeft.className = "annotation-rotate annotation-rotate-left";
+  rotLeft.textContent = "↺";
+  rotLeft.title = "Tourner à gauche";
+  rotLeft.addEventListener("click", (e) => {
+    e.stopPropagation();
+    rotation -= 15;
+    label.style.transform = `rotate(${rotation}deg)`;
+  });
+
+  // Bouton rotation droite
+  const rotRight = document.createElement("i");
+  rotRight.className = "annotation-rotate annotation-rotate-right";
+  rotRight.textContent = "↻";
+  rotRight.title = "Tourner à droite";
+  rotRight.addEventListener("click", (e) => {
+    e.stopPropagation();
+    rotation += 15;
+    label.style.transform = `rotate(${rotation}deg)`;
+  });
+
+  // Bouton supprimer
+  const del = document.createElement("i");
+  del.className = "annotation-delete";
+  del.textContent = "✕";
+  del.title = "Supprimer";
+  del.addEventListener("click", (e) => {
+    e.stopPropagation();
+    mapEl.removeChild(label);
+    const idx = annotations.findIndex(a => a.el === label);
+    if (idx !== -1) annotations.splice(idx, 1);
+  });
+
+  controls.appendChild(rotLeft);
+  controls.appendChild(rotRight);
+  controls.appendChild(del);
+  label.appendChild(controls);
+
+  // Drag : on déplace en coordonnées géo
+  let dragging = false;
+  let dragOffsetX = 0, dragOffsetY = 0;
+
+  label.addEventListener("mousedown", (e) => {
+    if (e.target.closest(".annotation-controls")) return;
+    dragging = true;
+    const rect = label.getBoundingClientRect();
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+    label.style.opacity = "0.8";
+    map.dragPan.disable();
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const mapRect = mapEl.getBoundingClientRect();
+    const px = e.clientX - mapRect.left - dragOffsetX;
+    const py = e.clientY - mapRect.top - dragOffsetY;
+    label.style.left = px + "px";
+    label.style.top = py + "px";
+    const geo = map.unproject([px, py]);
+    const entry = annotations.find(a => a.el === label);
+    if (entry) entry.lngLat = [geo.lng, geo.lat];
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (dragging) {
+      dragging = false;
+      label.style.opacity = "1";
+      map.dragPan.enable();
+    }
+  });
+
+  mapEl.appendChild(label);
+
+  const entry = { lngLat: [lngLat.lng, lngLat.lat], el: label };
+  annotations.push(entry);
+  repositionAnnotation(entry);
+}
+
+function repositionAnnotation(entry) {
+  const point = map.project(entry.lngLat);
+  entry.el.style.left = point.x + "px";
+  entry.el.style.top = point.y + "px";
+}
+
+function repositionAllAnnotations() {
+  annotations.forEach(repositionAnnotation);
+}
+
+// Reposition à chaque mouvement/zoom de la carte
+map.on("move", repositionAllAnnotations);
+map.on("zoom", repositionAllAnnotations);
+
 // --- Légende bordures non prélevées ---
 const borduresValeur = document.getElementById("bordures-valeur");
 const borduresUnite = document.getElementById("bordures-unite");
@@ -611,7 +837,7 @@ function updateBorduresAffichage() {
   const unite = borduresUnite.value;
   const exportEl = document.getElementById("legende-bordures-export");
   if (val && val > 0) {
-    exportEl.textContent = `Bordures non prélevées : ≈ ${val} ${unite}`;
+    exportEl.textContent = `Bordures non prélevées : ${val} ${unite}`;
     exportEl.style.display = "block";
   } else {
     exportEl.style.display = "none";

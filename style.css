@@ -116,6 +116,14 @@ h2 {
   background: #4CAF50; 
 }
 
+.btn-sampling.delete {
+  background: #E53935;
+}
+
+.btn-sampling.delete:hover {
+  background: #B71C1C;
+}
+
 .btn-small { 
   flex: none; 
   padding: 8px; 
@@ -349,6 +357,15 @@ hr {
   background: #45a049; 
 }
 
+.modal-btn-edit {
+  background: #673AB7;
+  color: white;
+}
+
+.modal-btn-edit:hover {
+  background: #5E35B1;
+}
+
 .modal-btn-cancel { 
   background: #9E9E9E; 
   color: white; 
@@ -474,4 +491,99 @@ hr {
   padding: 10px 14px;
   border-radius: 8px;
   font-size: 13px;
+}
+
+/* Bouton undo */
+.btn-undo {
+  background: #FF7043;
+  display: none;
+}
+.btn-undo:hover { background: #E64A19; }
+
+/* Bouton annotation */
+.btn-annotate {
+  background: #455A64;
+  margin-top: 5px;
+}
+.btn-annotate:hover { background: #37474F; }
+.btn-annotate.active {
+  background: #E91E63;
+  animation: pulse-annotate 1s infinite;
+}
+@keyframes pulse-annotate {
+  0%   { box-shadow: 0 0 0 0 rgba(233,30,99,0.5); }
+  70%  { box-shadow: 0 0 0 7px rgba(233,30,99,0); }
+  100% { box-shadow: 0 0 0 0 rgba(233,30,99,0); }
+}
+
+/* Étiquettes sur la carte */
+.map-annotation {
+  position: absolute;
+  background: rgba(20, 20, 35, 0.88);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  padding: 7px 12px 7px 10px;
+  font-size: 13px;
+  font-family: Arial, sans-serif;
+  color: #f0f0f0;
+  cursor: move;
+  user-select: none;
+  max-width: 220px;
+  word-wrap: break-word;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.5);
+  z-index: 500;
+  line-height: 1.5;
+  pointer-events: auto;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.map-annotation:hover {
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.65);
+}
+.map-annotation:hover .annotation-controls { display: flex; }
+body.exporting .annotation-controls { display: none !important; }
+body.exporting .map-annotation { cursor: default; }
+
+.annotation-controls {
+  display: none;
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  gap: 4px;
+  align-items: center;
+}
+
+.annotation-rotate,
+.annotation-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 13px;
+  cursor: pointer;
+  font-style: normal;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  transition: background 0.15s, transform 0.15s;
+  user-select: none;
+}
+
+.annotation-rotate {
+  background: rgba(30, 30, 50, 0.9);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.3);
+}
+.annotation-rotate:hover {
+  background: #673AB7;
+  transform: scale(1.15);
+}
+
+.annotation-delete {
+  background: #E53935;
+  color: white;
+}
+.annotation-delete:hover {
+  background: #b71c1c;
+  transform: scale(1.15);
 }

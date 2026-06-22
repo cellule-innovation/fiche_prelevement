@@ -31,9 +31,10 @@
       <button id="edit-info" class="btn btn-modify" style="display:none;">📝 Modifier info</button>
       <button id="modify-parcelle" class="btn btn-modify" style="display:none;">✏️ Modifier forme</button>
       <button id="cancel-draw" class="btn btn-cancel">❌ Annuler</button>
+      <button id="undo-point" class="btn btn-undo" style="display:none;">↩ Retour</button>
       <button id="delete-parcelle" class="btn btn-delete">🗑️ Supprimer</button>
     </div>
-    <button id="sampling-points" class="btn btn-sampling btn-small">📍 Ajouter points de prélèvement</button>
+    <button id="sampling-points" class="btn btn-sampling btn-small">📍 Ajouter des points de prélèvement</button>
     <div id="legende-bordures">
       <span>Bordures non prélevées :</span>
       <input type="number" id="bordures-valeur" min="0" placeholder="0">
@@ -44,7 +45,7 @@
     </div>
     <button id="draw-sampling" class="btn btn-draw btn-small" style="display:none;">✚ Flèche prélèvement</button>
     <button id="export" class="btn btn-export btn-small">📷 Exporter Image</button>
-    <button id="export-geojson" class="btn btn-geojson btn-small">💾 Exporter GeoJSON</button>
+    <button id="annotate-btn" class="btn btn-annotate btn-small">🏷️ Ajouter une annotation</button>
     <hr>
     <h2>📋 Liste des Parcelles</h2>
     <div class="parcelles-list" id="parcelles-list">
@@ -101,6 +102,22 @@
     </div>
   </div>
 </div>
+
+  <!-- Modal annotation -->
+  <div id="modal-annotation" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header" id="annotation-modal-header">🏷️ Nouvelle annotation</div>
+      <div class="form-group">
+        <label for="annotation-text">Texte</label>
+        <textarea id="annotation-text" rows="3" placeholder="Ex: Voisin – Blé conventionnel" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:4px;font-size:13px;font-family:Arial,sans-serif;resize:vertical;box-sizing:border-box;"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn-cancel" id="annotation-cancel">Annuler</button>
+        <button type="button" class="modal-btn modal-btn-save" id="annotation-save">Placer</button>
+        <button type="button" class="modal-btn modal-btn-edit" id="annotation-edit" style="display:none;">✏️ Modifier</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Script personnalisé -->
   <script src="app.js"></script>
